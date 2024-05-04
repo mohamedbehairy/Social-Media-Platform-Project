@@ -1,0 +1,362 @@
+#include <iostream>
+#include <string>
+#include <vector>
+#include <fstream>
+#include <sstream>
+using namespace std;
+
+class Post {
+private:
+    string content;
+    int likes;
+    vector<string> comments;
+
+public:
+    Post(const string& content) : content(content), likes(0) {} //constructor
+
+    void like() {
+        likes++;
+    }
+
+    void addComment(const string& comment) {
+        comments.push_back(comment); //vector
+    }
+
+    void display() const {
+        cout << "Post Content: " << content << endl;
+        cout << "Likes: " << likes << endl;
+        cout << "Comments: " << endl;
+        for (const auto& comment : comments) { //for each
+            cout << "- " << comment << endl;
+        }
+    }
+
+    string getContent() const {
+        return content;
+    }
+
+    int getLikes() const {
+        return likes;
+    }
+
+    const vector<string>& getComments() const {
+        return comments;
+    }
+
+    // Overloading the << operator for easy printing of Post objects
+    friend ostream& operator<<(ostream& os, const Post& post) {
+        os << "Post Content: " << post.content << "\nLikes: " << post.likes << "\nComments:\n";
+        for (const auto& comment : post.comments) {
+            os << "-" << comment << "\n";
+        }
+        return os;
+//This line declares the operator<< function as a friend of the Post class.
+// It allows the operator "<<" function to access the private members of the Post class (content, likes, and comments).
+// The ostream& os parameter represents the output stream, and const Post& post represents the Post object being printed.
+    }
+};
+
+class User {
+protected:
+    string username;
+    string password;
+    vector<Post> posts;
+
+public:
+    User(const string& username, const string& password) : username(username), password(password) {} //constructor
+
+    string getUsername() const {
+        return username;
+    }
+
+    string getPassword() const {
+        return password;
+    }
+
+    void createPost(const string& content) {
+        Post p(content);  // obj = p
+        posts.push_back(p);
+    }
+
+    void likePost(int postIndex) {
+        if (postIndex >= 1 && postIndex <= posts.size()) {
+            posts[postIndex - 1].like();
+        }
+    }
+
+    void commentOnPost(int postIndex, const string& comment) {
+        if (postIndex >= 1 && postIndex <= posts.size()) {
+            posts[postIndex - 1].addComment(comment);
+        }
+    }
+
+     void displayPosts() const {
+        for (const auto& post : posts) {
+            post.display();
+            cout << endl;
+        }
+    }
+
+     void displayProfile() const {
+        cout << "Username: " << username << endl;
+        cout << "Number of Posts: " << posts.size() << endl;
+    }
+
+    const vector<Post>& getPosts() const {
+        return posts;
+    }
+
+     ~User() {}
+};
+
+class AdminUser : public User {
+public:
+    AdminUser(const string& username, const string& password) : User(username, password) {}
+
+    void likePost(int postIndex)  {
+        if (postIndex >= 0 && postIndex < posts.size()) {
+            posts[postIndex-1].like();
+           // posts[postIndex].like();
+        }
+    }
+
+    void displayProfile() const  {
+        cout << "Username: " << username << " (Admin)" << endl;
+        cout << "Number of Posts: " << posts.size() << endl;
+    }
+};
+
+class SocialMediaPlatform {
+private:
+    vector<User*> users;
+
+public:
+    void registerUser(const string& username, const string& password) {
+        User* user = new User(username, password);
+        users.push_back(user);
+    }
+
+    void registerAdminUser(const string& username, const string& password) {
+        User* adminUser = new AdminUser(username, password);
+        users.push_back(adminUser);
+    }
+
+    User* loginUser(const string& username, const string& password) {
+        for (auto& user : users) {
+            if (user->getUsername() == username && user->getPassword() == password) {
+                return user;
+            }
+        }
+        return nullptr;
+    }
+
+    void saveDataToFile(const string& filename) {
+        ofstream outFile(filename);
+        if (outFile.is_open()) {
+            for (const auto& user : users) {
+                outFile << user->getUsername() << " " << user->getPassword() << " ";
+                for (const auto& post : user->getPosts()) {
+                    outFile << post.getContent() << "|" << post.getLikes() << "|";
+                    for (const auto& comment : post.getComments()) {
+                        outFile << comment << ",";
+                    }
+                    outFile << ";";
+                }
+                outFile << endl;
+            }
+            outFile.close();
+            cout << "Data saved to file: " << filename << endl;
+        } else {
+            cout << "Unable to open file for writing." << endl;
+        }
+    }
+
+    void loadDataFromFile(const string& filename) {
+        ifstream inFile(filename);
+        if (inFile.is_open()) {
+            string line;
+            while (getline(inFile, line)) {
+                istringstream iss(line);
+                string username, password;
+                iss >> username >> password;
+                User* user = new User(username, password);
+                string postInfo;
+                while (iss >> postInfo) {
+                    istringstream postStream(postInfo);
+                    string content;
+                    int likes;
+                    char delim;
+                    getline(postStream, content, '|');
+                    postStream >> likes >> delim;
+                    Post post(content);
+                    post.like();
+                    string comment;
+                    while (getline(postStream, comment, ',')) {
+                        post.addComment(comment);
+                    }
+                    user->createPost(content);
+                }
+                users.push_back(user);
+            }
+            inFile.close();
+            cout << "Data loaded from file: " << filename << endl;
+        } else {
+            cout << "Unable to open file for reading." << endl;
+        }
+    }
+
+    ~SocialMediaPlatform() {
+        for (auto& user : users) {
+            delete user;
+        }
+    }
+};
+
+int main() {
+
+    SocialMediaPlatform platform;
+    const int MAX_USERS = 100;
+    User* users[MAX_USERS];
+    int numUsers = 0;
+    User* currentUser ;
+
+    while (true) {
+        cout << "Social Media Platform Menu:" << endl;
+        cout << "1. Register User" << endl;
+        cout << "2. Register Admin User" << endl;
+        cout << "3. Login" << endl;
+        cout << "4. Save Data to File" << endl;
+        cout << "5. Load Data from File" << endl;
+        cout << "6. Exit" << endl;
+
+        int choice;
+        cout << "Enter num of your choice: ";
+        cin >> choice;
+
+        switch (choice) {
+            case 1: {
+                string username, password;
+                cout << "Enter username: ";
+                cin >> username;
+                cout << "Enter password: ";
+                cin >> password;
+                platform.registerUser(username, password);
+                cout << "User registered successfully." << endl;
+                break;
+            }
+            case 2: {
+                string username, password;
+                cout << "Enter Admin username: ";
+                cin >> username;
+                cout << "Enter Admin password: ";
+                cin >> password;
+                platform.registerAdminUser(username, password);
+                cout << "Admin user registered successfully." << endl;
+                break;
+            }
+            case 3: {
+                string username, password;
+                cout << "Enter username: ";
+                cin >> username;
+                cout << "Enter password: ";
+                cin >> password;
+                currentUser = platform.loginUser(username, password);
+
+                if (currentUser != nullptr) {
+                    cout << "Login successful. Welcome, " << currentUser->getUsername() << "!" << endl;
+                    while (true) {
+                        cout << "\nUser Menu:" << endl;
+                        cout << "1. Create Post" << endl;
+                        cout << "2. Like Post" << endl;
+                        cout << "3. Comment on Post" << endl;
+                        cout << "4. Display Posts" << endl;
+                        cout << "5. Display Profile" << endl;
+                        cout << "6. Logout" << endl;
+
+                        int userChoice;
+                        cout << "Enter your choice: ";
+                        cin >> userChoice;
+
+                        switch (userChoice) {
+                            case 1: {
+                                string content;
+                                cout << "Enter post content: ";
+                                cin.ignore();
+                                getline(cin, content);
+                                currentUser->createPost(content);
+                                cout << "Post created successfully." << endl;
+                                break;
+                            }
+                            case 2: {
+                                int postIndex;
+                                cout << "Enter post index to like: ";
+                                cin >> postIndex;
+                                currentUser->likePost(postIndex);
+                                cout << "Post liked successfully." << endl;
+                                break;
+                            }
+                            case 3: {
+                                int postIndex;
+                                cout << "Enter post index to comment on: ";
+                                cin >> postIndex;
+                                string comment;
+                                cout << "Enter comment: ";
+                                cin.ignore();
+                                getline(cin, comment);
+                                currentUser->commentOnPost(postIndex, comment);
+                                cout << "Comment added successfully." << endl;
+                                break;
+                            }
+                            case 4:
+                                currentUser->displayPosts();
+                                break;
+                            case 5:
+                                currentUser->displayProfile();
+                                break;
+                            case 6:
+                                cout << "Logging out..." << endl;
+                                currentUser = nullptr;
+                                break;
+                            default:
+                                cout << "Invalid choice. Try again." << endl;
+                        }
+
+                        if (currentUser == nullptr) {
+                            break;
+                        }
+                    }
+                } else {
+                    cout << "Login failed. Invalid username or password." << endl;
+                }
+                break;
+            }
+            case 4: {
+                string filename;
+                cout << "Enter filename to save data: ";
+                cin >> filename;
+                platform.saveDataToFile(filename);
+                break;
+            }
+            case 5: {
+                string filename;
+                cout << "Enter filename to load data from: ";
+                cin >> filename;
+                platform.loadDataFromFile(filename);
+                break;
+            }
+            case 6:
+                cout << "Exiting program. Goodbye!" << endl;
+                return 0;
+            default:
+                cout << "Invalid choice. Try again." << endl;
+        }
+    }
+
+
+    // Clean up memory
+    for (int i = 0; i < numUsers; i++) {
+        delete users[i];
+    }
+
+    return 0;
+}
